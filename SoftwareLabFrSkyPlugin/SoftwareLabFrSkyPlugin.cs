@@ -79,7 +79,7 @@ namespace MissionPlanner.SoftwareLab
             }
             catch (Exception ex)
             {
-                ShowAutoCloseMessage($"Failed to apply config: {ex.Message}");
+                ShowAutoCloseMessage($"Failed to apply config: {ex.Message}", NotificationSeverity.Error);
             }
         }
 

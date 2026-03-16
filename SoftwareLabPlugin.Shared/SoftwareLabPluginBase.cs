@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace MissionPlanner.SoftwareLab
 {
-    internal abstract class SoftwareLabPluginBase : MissionPlanner.Plugin.Plugin
+    public abstract class SoftwareLabPluginBase : MissionPlanner.Plugin.Plugin
     {
         private readonly Dictionary<string, float> localParamCache = new Dictionary<string, float>();
         private bool hasWarnedMissingNotificationsPlugin;
@@ -177,11 +177,12 @@ namespace MissionPlanner.SoftwareLab
             if (lines == null || lines.Count == 0)
                 return;
 
+            NotificationDisplayOptions displayOptions = GetEffectiveDisplayOptions(lines, options);
             INotificationService notificationService = NotificationServiceRegistry.Current;
             if (notificationService != null)
             {
                 hasWarnedMissingNotificationsPlugin = false;
-                notificationService.ShowMessage(lines, options ?? NotificationDisplayOptions.Default);
+                notificationService.ShowMessage(lines, displayOptions);
                 return;
             }
 
@@ -191,6 +192,16 @@ namespace MissionPlanner.SoftwareLab
                 Name,
                 MessageBoxButtons.OK,
                 lines.Any(line => line.Severity == NotificationSeverity.Error) ? MessageBoxIcon.Error : MessageBoxIcon.Information);
+        }
+
+        private static NotificationDisplayOptions GetEffectiveDisplayOptions(
+            IReadOnlyList<NotificationLine> lines,
+            NotificationDisplayOptions options)
+        {
+            NotificationDisplayOptions displayOptions = options ?? NotificationDisplayOptions.Default;
+            return lines.Any(line => line.Severity == NotificationSeverity.Error)
+                ? NotificationDisplayOptions.CreateManualClose()
+                : displayOptions;
         }
 
         private void WarnMissingNotificationsPluginOnce()

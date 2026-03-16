@@ -57,7 +57,7 @@ namespace MissionPlanner.SoftwareLab
             }
             catch (Exception ex)
             {
-                ShowAutoCloseMessage($"Failed to toggle switch: {ex.Message}");
+                ShowAutoCloseMessage($"Failed to toggle switch: {ex.Message}", NotificationSeverity.Error);
             }
         }
 
