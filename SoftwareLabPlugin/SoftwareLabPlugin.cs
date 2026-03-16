@@ -258,8 +258,6 @@ namespace MissionPlanner.SoftwareLab
 
                 List<string> successLines = new List<string>();
                 List<string> failureLines = new List<string>();
-                bool hasFailure = false;
-
                 foreach (var kvp in targetParams)
                 {
                     bool success = SetSingleParam(kvp.Key, kvp.Value, false, false);
@@ -270,30 +268,25 @@ namespace MissionPlanner.SoftwareLab
                     }
                     else
                     {
-                        hasFailure = true;
                         failureLines.Add($"{kvp.Key}: failed to set to {kvp.Value}");
                     }
                 }
 
-                string title = giveControl ? "Give Control" : "Take Control";
-
-                if (!hasFailure)
+                if (successLines.Count > 0 && failureLines.Count == 0)
                 {
-                    string details = "Succeeded:" + Environment.NewLine + string.Join(Environment.NewLine, successLines);
-                    ShowAutoCloseMessage($"{title} applied{Environment.NewLine}{details}");
+                    ShowAutoCloseMessage("Succeeded: " + string.Join(", ", successLines));
                     return;
                 }
 
-                List<string> sections = new List<string>();
+                if (failureLines.Count > 0 && successLines.Count == 0)
+                {
+                    ShowAutoCloseMessage("Failed: " + string.Join(", ", failureLines));
+                    return;
+                }
 
-                if (successLines.Count > 0)
-                    sections.Add("Succeeded:" + Environment.NewLine + string.Join(Environment.NewLine, successLines));
-
-                if (failureLines.Count > 0)
-                    sections.Add("Failed:" + Environment.NewLine + string.Join(Environment.NewLine, failureLines));
-
-                string detailsWithErrors = string.Join(Environment.NewLine + Environment.NewLine, sections);
-                ShowAutoCloseMessage($"{title} completed with errors{Environment.NewLine}{detailsWithErrors}");
+                ShowAutoCloseMessage(
+                    "Succeeded: " + string.Join(", ", successLines) + Environment.NewLine +
+                    "Failed: " + string.Join(", ", failureLines));
             }
             catch (Exception ex)
             {
