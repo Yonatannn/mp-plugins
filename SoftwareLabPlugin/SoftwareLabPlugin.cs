@@ -287,9 +287,9 @@ namespace MissionPlanner.SoftwareLab
             if (config == null)
                 throw new InvalidOperationException("Config file is empty or invalid.");
 
-            config.GiveControl ??= new Dictionary<string, float>();
-            config.TakeControl ??= new Dictionary<string, float>();
-
+            if (config.GiveControl == null) config.GiveControl = new Dictionary<string, float>();
+            if (config.TakeControl == null) config.TakeControl = new Dictionary<string, float>();
+            
             return config;
         }
 
