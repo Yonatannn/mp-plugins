@@ -23,6 +23,8 @@ namespace MissionPlanner.SoftwareLab
         private ToolStripMenuItem gpsMenu;
         private ToolStripMenuItem frskyMenu;
 
+        private Dictionary<string, float> localParamCache = new Dictionary<string, float>();
+
         public override bool Init()
         {
             try
@@ -125,19 +127,34 @@ namespace MissionPlanner.SoftwareLab
             if (!IsConnected())
                 return false;
 
-            var paramTable = Host.comPort.MAV?.param;
-            if (paramTable == null || !paramTable.ContainsKey(name))
-                return false;
-
-            try
+            if (localParamCache.ContainsKey(name))
             {
-                value = Convert.ToSingle(paramTable[name]);
+                value = localParamCache[name];
                 return true;
             }
-            catch
+
+            var paramTable = Host.comPort.MAV?.param;
+            if (paramTable != null && paramTable.ContainsKey(name))
             {
-                return false;
+                try
+                {
+                    var rawValue = paramTable[name];
+                    
+                    if (float.TryParse(rawValue.ToString(), out float parsedValue))
+                        value = parsedValue;
+                    else
+                        value = Convert.ToSingle(rawValue);
+
+                    localParamCache[name] = value;
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
             }
+
+            return false;
         }
 
         private bool SetSingleParam(string name, float value, bool showSuccessMessage = true)
@@ -157,6 +174,8 @@ namespace MissionPlanner.SoftwareLab
                     ShowAutoCloseMessage($"Failed to set {name} to {value}");
                     return false;
                 }
+
+                localParamCache[name] = value;
 
                 if (showSuccessMessage)
                     ShowAutoCloseMessage($"Set {name} to {value}");
@@ -180,15 +199,22 @@ namespace MissionPlanner.SoftwareLab
 
             try
             {
-                float currentValue = Convert.ToSingle(Host.comPort.GetParam(GpsAutoSwitchParamName));
+                float currentValue;
+                
+                if (!TryGetCachedParam(GpsAutoSwitchParamName, out currentValue))
+                {
+                    currentValue = Convert.ToSingle(Host.comPort.GetParam(GpsAutoSwitchParamName));
+                    localParamCache[GpsAutoSwitchParamName] = currentValue;
+                }
+
                 float nextValue = Math.Abs(currentValue - 1f) < 0.001f ? 0f : 1f;
 
-                if (SetSingleParam(GpsAutoSwitchParamName, nextValue))
+                if (SetSingleParam(GpsAutoSwitchParamName, nextValue, true))
                     UpdateGpsAutoText(item);
             }
-            catch
+            catch (Exception ex)
             {
-                ShowAutoCloseMessage($"{GpsAutoSwitchParamName} not found");
+                ShowAutoCloseMessage($"Failed to toggle switch: {ex.Message}");
             }
         }
 
