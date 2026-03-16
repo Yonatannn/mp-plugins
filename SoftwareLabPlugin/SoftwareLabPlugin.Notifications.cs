@@ -7,6 +7,9 @@ namespace MissionPlanner.SoftwareLab
 {
     public partial class SoftwareLabPlugin
     {
+        private const int NotificationPadding = 6;
+        private const int NotificationLineSpacing = 2;
+
         private sealed class NotificationLine
         {
             public NotificationLine(string text, Color color)
@@ -17,6 +20,71 @@ namespace MissionPlanner.SoftwareLab
 
             public string Text { get; }
             public Color Color { get; }
+        }
+
+        private sealed class NotificationView : Control
+        {
+            private readonly IReadOnlyList<NotificationLine> lines;
+
+            public NotificationView(IReadOnlyList<NotificationLine> lines)
+            {
+                this.lines = lines;
+                DoubleBuffered = true;
+                ResizeRedraw = true;
+                BackColor = SystemColors.Control;
+                Font = new Font("Arial", 12, FontStyle.Bold);
+                Padding = new Padding(NotificationPadding);
+                Dock = DockStyle.Fill;
+            }
+
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                base.OnPaint(e);
+
+                if (lines == null || lines.Count == 0)
+                    return;
+
+                TextFormatFlags flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPadding;
+                int availableWidth = Math.Max(0, ClientSize.Width - Padding.Horizontal);
+                int totalHeight = GetTotalTextHeight(e.Graphics, availableWidth, flags);
+                int currentY = Padding.Top + Math.Max(0, (ClientSize.Height - Padding.Vertical - totalHeight) / 2);
+
+                foreach (NotificationLine line in lines)
+                {
+                    Size lineSize = TextRenderer.MeasureText(
+                        e.Graphics,
+                        line.Text,
+                        Font,
+                        new Size(availableWidth, int.MaxValue),
+                        flags);
+
+                    Rectangle textBounds = new Rectangle(Padding.Left, currentY, availableWidth, lineSize.Height);
+                    TextRenderer.DrawText(e.Graphics, line.Text, Font, textBounds, line.Color, flags);
+                    currentY += lineSize.Height + NotificationLineSpacing;
+                }
+            }
+
+            private int GetTotalTextHeight(Graphics graphics, int availableWidth, TextFormatFlags flags)
+            {
+                int totalHeight = 0;
+
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    Size lineSize = TextRenderer.MeasureText(
+                        graphics,
+                        lines[i].Text,
+                        Font,
+                        new Size(availableWidth, int.MaxValue),
+                        flags);
+
+                    totalHeight += lineSize.Height;
+
+                    if (i < lines.Count - 1)
+                        totalHeight += NotificationLineSpacing;
+                }
+
+                return totalHeight;
+            }
         }
 
         private void ShowAutoCloseMessage(string message)
@@ -49,38 +117,12 @@ namespace MissionPlanner.SoftwareLab
                 ShowInTaskbar = false
             };
 
-            TableLayoutPanel layout = new TableLayoutPanel
+            NotificationView notificationView = new NotificationView(lines)
             {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 1,
-                RowCount = lines.Count,
-                Padding = new Padding(6)
+                BackColor = form.BackColor
             };
 
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-
-            for (int i = 0; i < lines.Count; i++)
-            {
-                NotificationLine line = lines[i];
-                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-                layout.Controls.Add(new Label
-                {
-                    Text = line.Text,
-                    AutoSize = true,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    Font = new Font("Arial", 12, FontStyle.Bold),
-                    ForeColor = line.Color,
-                    MaximumSize = new Size(NotificationWidth - 24, 0),
-                    Margin = new Padding(0, 0, 0, 3)
-                }, 0, i);
-            }
-
-            form.Controls.Add(layout);
-            Size layoutSize = layout.GetPreferredSize(form.ClientSize);
-            layout.Location = new Point(
-                Math.Max(0, (form.ClientSize.Width - layoutSize.Width) / 2),
-                Math.Max(0, (form.ClientSize.Height - layoutSize.Height) / 2));
+            form.Controls.Add(notificationView);
 
             lock (activeNotifications)
             {
