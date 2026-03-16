@@ -24,6 +24,10 @@ namespace MissionPlanner.SoftwareLab
         private ToolStripMenuItem frskyMenu;
 
         private Dictionary<string, float> localParamCache = new Dictionary<string, float>();
+        private static readonly List<Form> activeNotifications = new List<Form>();
+        private const int NotificationWidth = 420;
+        private const int NotificationHeight = 220;
+        private const int NotificationSpacing = 12;
 
         public override bool Init()
         {
@@ -157,7 +161,7 @@ namespace MissionPlanner.SoftwareLab
             return false;
         }
 
-        private bool SetSingleParam(string name, float value, bool showSuccessMessage = true)
+        private bool SetSingleParam(string name, float value, bool showSuccessMessage = true, bool showFailureMessage = true)
         {
             if (!IsConnected())
             {
@@ -171,7 +175,9 @@ namespace MissionPlanner.SoftwareLab
 
                 if (!success)
                 {
-                    ShowAutoCloseMessage($"Failed to set {name} to {value}");
+                    if (showFailureMessage)
+                        ShowAutoCloseMessage($"Failed to set {name} to {value}");
+
                     return false;
                 }
 
@@ -184,7 +190,9 @@ namespace MissionPlanner.SoftwareLab
             }
             catch (Exception ex)
             {
-                ShowAutoCloseMessage($"Failed to set {name}: {ex.Message}");
+                if (showFailureMessage)
+                    ShowAutoCloseMessage($"Failed to set {name}: {ex.Message}");
+
                 return false;
             }
         }
@@ -253,7 +261,7 @@ namespace MissionPlanner.SoftwareLab
 
                 foreach (var kvp in targetParams)
                 {
-                    bool success = SetSingleParam(kvp.Key, kvp.Value, false);
+                    bool success = SetSingleParam(kvp.Key, kvp.Value, false, false);
                     resultLines.Add($"{kvp.Key}: {(success ? "Success" : "Failed")}");
 
                     if (!success)
@@ -316,22 +324,42 @@ namespace MissionPlanner.SoftwareLab
             Form form = new Form
             {
                 Text = "SoftwareLab Info",
-                Size = new Size(420, 220),
-                StartPosition = FormStartPosition.CenterScreen,
+                Size = new Size(NotificationWidth, NotificationHeight),
+                StartPosition = FormStartPosition.Manual,
                 TopMost = true,
-                FormBorderStyle = FormBorderStyle.FixedDialog
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                BackColor = Color.Gainsboro,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                ShowInTaskbar = false
             };
 
             Label label = new Label
             {
                 Text = message,
                 Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleLeft,
+                TextAlign = ContentAlignment.MiddleCenter,
                 Padding = new Padding(12),
-                Font = new Font("Arial", 9, FontStyle.Bold)
+                Font = new Font("Arial", 9, FontStyle.Bold),
+                BackColor = Color.Gainsboro
             };
 
             form.Controls.Add(label);
+
+            Rectangle workingArea = Screen.PrimaryScreen.WorkingArea;
+
+            lock (activeNotifications)
+            {
+                int index = activeNotifications.Count;
+                int x = workingArea.Right - NotificationWidth - NotificationSpacing;
+                int y = workingArea.Bottom - NotificationHeight - NotificationSpacing - (index * (NotificationHeight + NotificationSpacing));
+
+                if (y < NotificationSpacing)
+                    y = NotificationSpacing;
+
+                form.Location = new Point(x, y);
+                activeNotifications.Add(form);
+            }
 
             Timer timer = new Timer { Interval = 2500 };
             timer.Tick += (s, e) =>
@@ -343,6 +371,25 @@ namespace MissionPlanner.SoftwareLab
             form.FormClosed += (s, e) =>
             {
                 timer.Dispose();
+
+                lock (activeNotifications)
+                {
+                    activeNotifications.Remove(form);
+
+                    Rectangle updatedWorkingArea = Screen.PrimaryScreen.WorkingArea;
+                    for (int i = 0; i < activeNotifications.Count; i++)
+                    {
+                        Form activeForm = activeNotifications[i];
+                        int x = updatedWorkingArea.Right - NotificationWidth - NotificationSpacing;
+                        int y = updatedWorkingArea.Bottom - NotificationHeight - NotificationSpacing - (i * (NotificationHeight + NotificationSpacing));
+
+                        if (y < NotificationSpacing)
+                            y = NotificationSpacing;
+
+                        activeForm.Location = new Point(x, y);
+                    }
+                }
+
                 form.Dispose();
             };
 
