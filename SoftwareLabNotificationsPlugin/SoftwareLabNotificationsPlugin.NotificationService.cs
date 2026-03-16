@@ -5,22 +5,28 @@ using System.Windows.Forms;
 
 namespace MissionPlanner.SoftwareLab.Notifications
 {
-    internal sealed class SoftwareLabNotificationService : INotificationService, IDisposable
+    internal sealed class SoftwareLabNotificationService : IConfigurableNotificationService, IDisposable
     {
-        private const int NotificationWidth = 270;
-        private const int NotificationHeight = 135;
+        private const int NotificationWidth = 320;
+        private const int NotificationHeight = 160;
         private const int NotificationSpacing = 9;
-        private const int NotificationPadding = 8;
-        private const int NotificationLineSpacing = 2;
-        private const int NotificationDurationMs = 2500;
+        private const int NotificationPadding = 14;
+        private const int NotificationLineSpacing = 4;
+        private const int ManualHeaderHeight = 34;
+        private const int CloseButtonSize = 28;
 
-        private static readonly Color SuccessTextColor = Color.FromArgb(26, 110, 56);
-        private static readonly Color ErrorTextColor = Color.FromArgb(154, 40, 40);
-        private static readonly Color DefaultBackgroundColor = Color.FromArgb(244, 239, 221);
-        private static readonly Color DefaultBorderColor = Color.FromArgb(191, 184, 160);
+        private static readonly Color SuccessTextColor = Color.FromArgb(124, 208, 142);
+        private static readonly Color ErrorTextColor = Color.FromArgb(255, 135, 135);
+        private static readonly Color DefaultBackgroundColor = Color.FromArgb(66, 72, 79);
+        private static readonly Color DefaultBorderColor = Color.FromArgb(97, 104, 114);
+        private static readonly Color DefaultTextColor = Color.FromArgb(245, 247, 250);
+        private static readonly Color CloseButtonTextColor = Color.FromArgb(224, 228, 234);
+        private static readonly Color CloseButtonHoverColor = Color.FromArgb(86, 94, 104);
+        private static readonly Color CloseButtonPressedColor = Color.FromArgb(104, 112, 122);
 
         private readonly Func<Form> hostFormProvider;
         private readonly List<NotificationForm> activeNotifications = new List<NotificationForm>();
+        private readonly List<NotificationForm> openForms = new List<NotificationForm>();
         private readonly object syncRoot = new object();
 
         public SoftwareLabNotificationService(Func<Form> hostFormProvider)
@@ -30,30 +36,49 @@ namespace MissionPlanner.SoftwareLab.Notifications
 
         public void ShowMessage(string message)
         {
-            ShowMessage(message, NotificationSeverity.Info);
+            ShowMessage(message, NotificationSeverity.Info, NotificationDisplayOptions.Default);
+        }
+
+        public void ShowMessage(string message, NotificationDisplayOptions options)
+        {
+            ShowMessage(message, NotificationSeverity.Info, options);
         }
 
         public void ShowMessage(string message, NotificationSeverity severity)
         {
-            ShowMessage(new List<NotificationLine>
-            {
-                new NotificationLine(message, severity)
-            });
+            ShowMessage(message, severity, NotificationDisplayOptions.Default);
+        }
+
+        public void ShowMessage(string message, NotificationSeverity severity, NotificationDisplayOptions options)
+        {
+            ShowMessage(
+                new List<NotificationLine>
+                {
+                    new NotificationLine(message, severity)
+                },
+                options);
         }
 
         public void ShowMessage(IReadOnlyList<NotificationLine> lines)
+        {
+            ShowMessage(lines, NotificationDisplayOptions.Default);
+        }
+
+        public void ShowMessage(IReadOnlyList<NotificationLine> lines, NotificationDisplayOptions options)
         {
             if (lines == null || lines.Count == 0)
                 return;
 
             Form owner = GetOwnerForm();
+            NotificationDisplayOptions displayOptions = options ?? NotificationDisplayOptions.Default;
+
             if (owner != null && owner.InvokeRequired)
             {
-                owner.BeginInvoke(new Action(() => ShowMessage(lines)));
+                owner.BeginInvoke(new Action(() => ShowMessage(lines, displayOptions)));
                 return;
             }
 
-            ShowMessageInternal(lines, owner);
+            ShowMessageInternal(lines, displayOptions, owner);
         }
 
         public void Dispose()
@@ -62,7 +87,8 @@ namespace MissionPlanner.SoftwareLab.Notifications
 
             lock (syncRoot)
             {
-                formsToClose = activeNotifications.ToArray();
+                formsToClose = openForms.ToArray();
+                openForms.Clear();
                 activeNotifications.Clear();
             }
 
@@ -78,10 +104,51 @@ namespace MissionPlanner.SoftwareLab.Notifications
             }
         }
 
-        private void ShowMessageInternal(IReadOnlyList<NotificationLine> lines, Form owner)
+        private void ShowMessageInternal(IReadOnlyList<NotificationLine> lines, NotificationDisplayOptions options, Form owner)
         {
             NotificationTheme theme = NotificationTheme.Create(owner);
-            NotificationForm form = new NotificationForm
+            NotificationForm form = CreateNotificationForm(theme, options.RequiresManualClose);
+            NotificationView notificationView = new NotificationView(lines, theme);
+
+            ConfigureFormContent(form, notificationView, theme, options.RequiresManualClose);
+
+            Rectangle workingArea = GetWorkingArea(owner);
+
+            lock (syncRoot)
+            {
+                openForms.Add(form);
+
+                if (!options.RequiresManualClose)
+                {
+                    form.Location = GetNotificationLocation(workingArea, activeNotifications.Count);
+                    activeNotifications.Add(form);
+                }
+            }
+
+            if (options.RequiresManualClose)
+            {
+                form.Location = GetCenteredNotificationLocation(workingArea);
+                ConfigureManualCloseLifecycle(form);
+
+                if (owner != null)
+                    form.ShowDialog(owner);
+                else
+                    form.ShowDialog();
+
+                return;
+            }
+
+            ConfigureAutoCloseLifecycle(form, options.AutoCloseDurationMs);
+
+            if (owner != null)
+                form.Show(owner);
+            else
+                form.Show();
+        }
+
+        private static NotificationForm CreateNotificationForm(NotificationTheme theme, bool requiresManualClose)
+        {
+            return new NotificationForm(requiresManualClose)
             {
                 Size = new Size(NotificationWidth, NotificationHeight),
                 StartPosition = FormStartPosition.Manual,
@@ -91,19 +158,77 @@ namespace MissionPlanner.SoftwareLab.Notifications
                 BackColor = theme.BorderColor,
                 Padding = new Padding(1)
             };
+        }
 
-            NotificationView notificationView = new NotificationView(lines, theme);
-            form.Controls.Add(notificationView);
-
-            Rectangle workingArea = GetWorkingArea(owner);
-
-            lock (syncRoot)
+        private void ConfigureFormContent(NotificationForm form, NotificationView notificationView, NotificationTheme theme, bool requiresManualClose)
+        {
+            Panel contentPanel = new Panel
             {
-                form.Location = GetNotificationLocation(workingArea, activeNotifications.Count);
-                activeNotifications.Add(form);
+                Dock = DockStyle.Fill,
+                BackColor = theme.BackgroundColor
+            };
+
+            notificationView.Dock = DockStyle.Fill;
+            contentPanel.Controls.Add(notificationView);
+
+            if (requiresManualClose)
+            {
+                Panel headerPanel = new Panel
+                {
+                    Dock = DockStyle.Top,
+                    Height = ManualHeaderHeight,
+                    BackColor = theme.BackgroundColor
+                };
+
+                Button closeButton = CreateCloseButton(form, theme);
+                headerPanel.Controls.Add(closeButton);
+                contentPanel.Controls.Add(headerPanel);
+                form.CancelButton = closeButton;
             }
 
-            Timer timer = new Timer { Interval = NotificationDurationMs };
+            form.Controls.Add(contentPanel);
+        }
+
+        private static Button CreateCloseButton(Form form, NotificationTheme theme)
+        {
+            Button closeButton = new Button
+            {
+                Text = "X",
+                Dock = DockStyle.Right,
+                Width = CloseButtonSize,
+                FlatStyle = FlatStyle.Flat,
+                UseVisualStyleBackColor = false,
+                TabStop = false,
+                Cursor = Cursors.Hand,
+                ForeColor = CloseButtonTextColor,
+                BackColor = theme.BackgroundColor,
+                Margin = Padding.Empty
+            };
+
+            closeButton.FlatAppearance.BorderSize = 0;
+            closeButton.FlatAppearance.MouseOverBackColor = CloseButtonHoverColor;
+            closeButton.FlatAppearance.MouseDownBackColor = CloseButtonPressedColor;
+            closeButton.Click += (sender, args) => form.Close();
+
+            return closeButton;
+        }
+
+        private void ConfigureManualCloseLifecycle(NotificationForm form)
+        {
+            form.FormClosed += (sender, args) =>
+            {
+                lock (syncRoot)
+                {
+                    openForms.Remove(form);
+                }
+
+                form.Dispose();
+            };
+        }
+
+        private void ConfigureAutoCloseLifecycle(NotificationForm form, int autoCloseDurationMs)
+        {
+            Timer timer = new Timer { Interval = autoCloseDurationMs };
             timer.Tick += (sender, args) =>
             {
                 timer.Stop();
@@ -116,6 +241,7 @@ namespace MissionPlanner.SoftwareLab.Notifications
 
                 lock (syncRoot)
                 {
+                    openForms.Remove(form);
                     activeNotifications.Remove(form);
                     RepositionActiveNotifications(GetWorkingArea(GetOwnerForm()));
                 }
@@ -124,17 +250,12 @@ namespace MissionPlanner.SoftwareLab.Notifications
             };
 
             timer.Start();
-
-            if (owner != null)
-                form.Show(owner);
-            else
-                form.Show();
         }
 
         private Form GetOwnerForm()
         {
             Form owner = hostFormProvider?.Invoke();
-            if (owner != null)
+            if (owner != null && !owner.IsDisposed)
                 return owner;
 
             return Application.OpenForms.Count > 0 ? Application.OpenForms[0] : null;
@@ -147,9 +268,16 @@ namespace MissionPlanner.SoftwareLab.Notifications
             return new Point(x, y);
         }
 
+        private static Point GetCenteredNotificationLocation(Rectangle workingArea)
+        {
+            int x = workingArea.Left + ((workingArea.Width - NotificationWidth) / 2);
+            int y = workingArea.Top + ((workingArea.Height - NotificationHeight) / 2);
+            return new Point(x, y);
+        }
+
         private static Rectangle GetWorkingArea(Form owner)
         {
-            if (owner != null)
+            if (owner != null && !owner.IsDisposed)
                 return Screen.FromControl(owner).WorkingArea;
 
             return Screen.PrimaryScreen.WorkingArea;
@@ -178,26 +306,10 @@ namespace MissionPlanner.SoftwareLab.Notifications
 
             public static NotificationTheme Create(Form owner)
             {
-                Color baseBackColor = owner?.BackColor ?? SystemColors.Control;
-                Color baseForeColor = owner?.ForeColor ?? SystemColors.ControlText;
                 Font baseFont = owner?.Font ?? SystemFonts.MessageBoxFont;
+                Font font = new Font(baseFont.FontFamily, Math.Max(11f, baseFont.Size + 1.5f), FontStyle.Bold);
 
-                Color backgroundColor = Blend(baseBackColor, DefaultBackgroundColor, 0.6f);
-                Color borderColor = Blend(baseBackColor, DefaultBorderColor, 0.5f);
-                Font font = new Font(baseFont.FontFamily, Math.Max(9f, baseFont.Size - 0.5f), FontStyle.Bold);
-
-                return new NotificationTheme(backgroundColor, borderColor, baseForeColor, font);
-            }
-
-            private static Color Blend(Color first, Color second, float ratio)
-            {
-                float clampedRatio = Math.Max(0f, Math.Min(1f, ratio));
-                float inverseRatio = 1f - clampedRatio;
-
-                return Color.FromArgb(
-                    (int)((first.R * inverseRatio) + (second.R * clampedRatio)),
-                    (int)((first.G * inverseRatio) + (second.G * clampedRatio)),
-                    (int)((first.B * inverseRatio) + (second.B * clampedRatio)));
+                return new NotificationTheme(DefaultBackgroundColor, DefaultBorderColor, DefaultTextColor, font);
             }
         }
 
@@ -294,7 +406,14 @@ namespace MissionPlanner.SoftwareLab.Notifications
 
         private sealed class NotificationForm : Form
         {
-            protected override bool ShowWithoutActivation => true;
+            private readonly bool activateOnShow;
+
+            public NotificationForm(bool activateOnShow)
+            {
+                this.activateOnShow = activateOnShow;
+            }
+
+            protected override bool ShowWithoutActivation => !activateOnShow;
         }
     }
 }

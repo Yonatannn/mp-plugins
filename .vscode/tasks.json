@@ -2,19 +2,51 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build SoftwareLab Controls Plugin",
+            "label": "Build SoftwareLab Plugins",
+            "dependsOn": [
+                "Build SoftwareLab GPS Plugin",
+                "Build SoftwareLab FrSky Plugin"
+            ],
+            "dependsOrder": "sequence",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Build SoftwareLab GPS Plugin",
             "type": "shell",
             "command": "dotnet",
             "args": [
                 "build",
-                "${workspaceFolder}/SoftwareLabPlugin/SoftwareLabPlugin.csproj"
+                "${workspaceFolder}/SoftwareLabGpsPlugin/SoftwareLabGpsPlugin.csproj"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
             },
-            "group": {
-                "kind": "build",
-                "isDefault": true
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Build SoftwareLab FrSky Plugin",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/SoftwareLabFrSkyPlugin/SoftwareLabFrSkyPlugin.csproj"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
             },
             "presentation": {
                 "reveal": "always",
