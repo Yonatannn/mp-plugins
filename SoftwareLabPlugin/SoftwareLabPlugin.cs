@@ -18,6 +18,8 @@ namespace MissionPlanner.SoftwareLab
         private const string GpsPrimaryParamName = "GPS_PRIMARY";
         private const string GpsAutoSwitchParamName = "GPS_AUTO_SWITCH";
         private const string ConfigFileName = "PluginConfig.json";
+        private const string GpsMenuText = "GPS Control";
+        private const string FrSkyMenuText = "FrSky Control";
 
         private string configFilePath;
         private ToolStripMenuItem gpsMenu;
@@ -28,6 +30,20 @@ namespace MissionPlanner.SoftwareLab
         private const int NotificationWidth = 360;
         private const int NotificationHeight = 180;
         private const int NotificationSpacing = 12;
+        private static readonly Color SuccessNotificationColor = Color.DarkGreen;
+        private static readonly Color FailureNotificationColor = Color.DarkRed;
+
+        private sealed class NotificationLine
+        {
+            public NotificationLine(string text, Color color)
+            {
+                Text = text;
+                Color = color;
+            }
+
+            public string Text { get; }
+            public Color Color { get; }
+        }
 
         public override bool Init()
         {
@@ -43,11 +59,7 @@ namespace MissionPlanner.SoftwareLab
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Failed to initialize plugin.\n{ex.Message}",
-                    "SoftwareLab Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ShowPluginError("initialize plugin", ex);
                 return false;
             }
         }
@@ -61,24 +73,8 @@ namespace MissionPlanner.SoftwareLab
 
                 RemoveExistingMenus();
 
-                gpsMenu = new ToolStripMenuItem("GPS Control");
-                var btnPrimary = new ToolStripMenuItem("Set Primary GPS (GPS 1)", null, (s, e) => SetSingleParam(GpsPrimaryParamName, 0));
-                var btnSecondary = new ToolStripMenuItem("Set Secondary GPS (GPS 2)", null, (s, e) => SetSingleParam(GpsPrimaryParamName, 1));
-                var btnAuto = new ToolStripMenuItem("Toggle Auto Switch");
-
-                gpsMenu.DropDownOpening += (s, e) => UpdateGpsAutoText(btnAuto);
-                btnAuto.Click += (s, e) => ToggleGpsAuto(btnAuto);
-
-                gpsMenu.DropDownItems.Add(btnPrimary);
-                gpsMenu.DropDownItems.Add(btnSecondary);
-                gpsMenu.DropDownItems.Add(btnAuto);
-
-                frskyMenu = new ToolStripMenuItem("FrSky Control");
-                var btnGive = new ToolStripMenuItem("Give Control to FrSky", null, (s, e) => ApplyControlConfig(true));
-                var btnTake = new ToolStripMenuItem("Take Control from FrSky", null, (s, e) => ApplyControlConfig(false));
-
-                frskyMenu.DropDownItems.Add(btnGive);
-                frskyMenu.DropDownItems.Add(btnTake);
+                gpsMenu = CreateGpsMenu();
+                frskyMenu = CreateFrSkyMenu();
 
                 Host.FDMenuHud.Items.Add(gpsMenu);
                 Host.FDMenuHud.Items.Add(frskyMenu);
@@ -87,11 +83,7 @@ namespace MissionPlanner.SoftwareLab
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Failed to load plugin menu.\n{ex.Message}",
-                    "SoftwareLab Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ShowPluginError("load plugin menu", ex);
                 return false;
             }
         }
@@ -103,8 +95,8 @@ namespace MissionPlanner.SoftwareLab
 
         private void RemoveExistingMenus()
         {
-            RemoveMenuByText("GPS Control");
-            RemoveMenuByText("FrSky Control");
+            RemoveMenuByText(GpsMenuText);
+            RemoveMenuByText(FrSkyMenuText);
         }
 
         private void RemoveMenuByText(string menuText)
@@ -119,9 +111,44 @@ namespace MissionPlanner.SoftwareLab
             }
         }
 
+        private ToolStripMenuItem CreateGpsMenu()
+        {
+            ToolStripMenuItem menu = new ToolStripMenuItem(GpsMenuText);
+            ToolStripMenuItem autoItem = CreateMenuItem("Toggle Auto Switch", (s, e) => ToggleGpsAuto((ToolStripMenuItem)s));
+
+            menu.DropDownOpening += (s, e) => UpdateGpsAutoText(autoItem);
+            menu.DropDownItems.Add(CreateMenuItem("Set Primary GPS (GPS 1)", (s, e) => SetSingleParam(GpsPrimaryParamName, 0)));
+            menu.DropDownItems.Add(CreateMenuItem("Set Secondary GPS (GPS 2)", (s, e) => SetSingleParam(GpsPrimaryParamName, 1)));
+            menu.DropDownItems.Add(autoItem);
+
+            return menu;
+        }
+
+        private ToolStripMenuItem CreateFrSkyMenu()
+        {
+            ToolStripMenuItem menu = new ToolStripMenuItem(FrSkyMenuText);
+            menu.DropDownItems.Add(CreateMenuItem("Give Control to FrSky", (s, e) => ApplyControlConfig(true)));
+            menu.DropDownItems.Add(CreateMenuItem("Take Control from FrSky", (s, e) => ApplyControlConfig(false)));
+            return menu;
+        }
+
+        private static ToolStripMenuItem CreateMenuItem(string text, EventHandler onClick)
+        {
+            return new ToolStripMenuItem(text, null, onClick);
+        }
+
         private bool IsConnected()
         {
             return Host?.comPort?.BaseStream != null && Host.comPort.BaseStream.IsOpen;
+        }
+
+        private bool EnsureConnected()
+        {
+            if (IsConnected())
+                return true;
+
+            ShowAutoCloseMessage("Vehicle not connected");
+            return false;
         }
 
         private bool TryGetCachedParam(string name, out float value)
@@ -131,43 +158,38 @@ namespace MissionPlanner.SoftwareLab
             if (!IsConnected())
                 return false;
 
-            if (localParamCache.ContainsKey(name))
-            {
-                value = localParamCache[name];
+            if (localParamCache.TryGetValue(name, out value))
                 return true;
-            }
 
             var paramTable = Host.comPort.MAV?.param;
-            if (paramTable != null && paramTable.ContainsKey(name))
+            if (paramTable == null || !paramTable.ContainsKey(name) || !TryConvertToFloat(paramTable[name], out value))
+                return false;
+
+            localParamCache[name] = value;
+            return true;
+        }
+
+        private static bool TryConvertToFloat(object rawValue, out float value)
+        {
+            try
             {
-                try
-                {
-                    var rawValue = paramTable[name];
-                    
-                    if (float.TryParse(rawValue.ToString(), out float parsedValue))
-                        value = parsedValue;
-                    else
-                        value = Convert.ToSingle(rawValue);
-
-                    localParamCache[name] = value;
+                if (float.TryParse(rawValue?.ToString(), out value))
                     return true;
-                }
-                catch
-                {
-                    return false;
-                }
-            }
 
-            return false;
+                value = Convert.ToSingle(rawValue);
+                return true;
+            }
+            catch
+            {
+                value = 0;
+                return false;
+            }
         }
 
         private bool SetSingleParam(string name, float value, bool showSuccessMessage = true, bool showFailureMessage = true)
         {
-            if (!IsConnected())
-            {
-                ShowAutoCloseMessage("Vehicle not connected");
+            if (!EnsureConnected())
                 return false;
-            }
 
             try
             {
@@ -176,7 +198,7 @@ namespace MissionPlanner.SoftwareLab
                 if (!success)
                 {
                     if (showFailureMessage)
-                        ShowAutoCloseMessage($"Failed to set {name} to {value}");
+                        ShowAutoCloseMessage(GetSetParamMessage(name, value, false), FailureNotificationColor);
 
                     return false;
                 }
@@ -184,14 +206,14 @@ namespace MissionPlanner.SoftwareLab
                 localParamCache[name] = value;
 
                 if (showSuccessMessage)
-                    ShowAutoCloseMessage($"Set {name} to {value}");
+                    ShowAutoCloseMessage(GetSetParamMessage(name, value, true), SuccessNotificationColor);
 
                 return true;
             }
             catch (Exception ex)
             {
                 if (showFailureMessage)
-                    ShowAutoCloseMessage($"Failed to set {name}: {ex.Message}");
+                    ShowAutoCloseMessage(GetSetParamExceptionMessage(name, ex), FailureNotificationColor);
 
                 return false;
             }
@@ -199,17 +221,12 @@ namespace MissionPlanner.SoftwareLab
 
         private void ToggleGpsAuto(ToolStripMenuItem item)
         {
-            if (!IsConnected())
-            {
-                ShowAutoCloseMessage("Vehicle not connected");
+            if (!EnsureConnected())
                 return;
-            }
 
             try
             {
-                float currentValue;
-                
-                if (!TryGetCachedParam(GpsAutoSwitchParamName, out currentValue))
+                if (!TryGetCachedParam(GpsAutoSwitchParamName, out float currentValue))
                 {
                     currentValue = Convert.ToSingle(Host.comPort.GetParam(GpsAutoSwitchParamName));
                     localParamCache[GpsAutoSwitchParamName] = currentValue;
@@ -239,11 +256,8 @@ namespace MissionPlanner.SoftwareLab
 
         private void ApplyControlConfig(bool giveControl)
         {
-            if (!IsConnected())
-            {
-                ShowAutoCloseMessage("Vehicle not connected");
+            if (!EnsureConnected())
                 return;
-            }
 
             try
             {
@@ -256,42 +270,53 @@ namespace MissionPlanner.SoftwareLab
                     return;
                 }
 
-                List<string> successLines = new List<string>();
-                List<string> failureLines = new List<string>();
-                foreach (var kvp in targetParams)
-                {
-                    bool success = SetSingleParam(kvp.Key, kvp.Value, false, false);
-
-                    if (success)
-                    {
-                        successLines.Add($"Set {kvp.Key} to {kvp.Value}");
-                    }
-                    else
-                    {
-                        failureLines.Add($"Failed to set {kvp.Key} to {kvp.Value}");
-                    }
-                }
-
-                if (successLines.Count > 0 && failureLines.Count == 0)
-                {
-                    ShowAutoCloseMessage(string.Join(", ", successLines));
-                    return;
-                }
-
-                if (failureLines.Count > 0 && successLines.Count == 0)
-                {
-                    ShowAutoCloseMessage(string.Join(", ", failureLines));
-                    return;
-                }
-
-                ShowAutoCloseMessage(
-                    string.Join(", ", successLines) + Environment.NewLine +
-                    string.Join(", ", failureLines));
+                ShowAutoCloseMessage(BuildParamUpdateLines(targetParams));
             }
             catch (Exception ex)
             {
                 ShowAutoCloseMessage($"Failed to apply config: {ex.Message}");
             }
+        }
+
+        private IReadOnlyList<NotificationLine> BuildParamUpdateLines(Dictionary<string, float> targetParams)
+        {
+            List<string> successMessages = new List<string>();
+            List<string> failureMessages = new List<string>();
+
+            foreach (var kvp in targetParams)
+            {
+                bool success = SetSingleParam(kvp.Key, kvp.Value, false, false);
+                List<string> targetMessages = success ? successMessages : failureMessages;
+                targetMessages.Add(GetSetParamMessage(kvp.Key, kvp.Value, success));
+            }
+
+            return CreateNotificationLines(successMessages, failureMessages);
+        }
+
+        private IReadOnlyList<NotificationLine> CreateNotificationLines(IReadOnlyCollection<string> successMessages, IReadOnlyCollection<string> failureMessages)
+        {
+            List<NotificationLine> lines = new List<NotificationLine>(2);
+            AddNotificationLine(lines, successMessages, SuccessNotificationColor);
+            AddNotificationLine(lines, failureMessages, FailureNotificationColor);
+            return lines;
+        }
+
+        private static void AddNotificationLine(ICollection<NotificationLine> lines, IReadOnlyCollection<string> messages, Color color)
+        {
+            if (messages.Count == 0)
+                return;
+
+            lines.Add(new NotificationLine(string.Join(", ", messages), color));
+        }
+
+        private static string GetSetParamMessage(string name, float value, bool success)
+        {
+            return success ? $"Set {name} to {value}" : $"Failed to set {name} to {value}";
+        }
+
+        private static string GetSetParamExceptionMessage(string name, Exception ex)
+        {
+            return $"Failed to set {name}: {ex.Message}";
         }
 
         private PluginConfig LoadConfig()
@@ -308,10 +333,7 @@ namespace MissionPlanner.SoftwareLab
             if (config == null)
                 throw new InvalidOperationException("Config file is empty or invalid.");
 
-            if (config.GiveControl == null) config.GiveControl = new Dictionary<string, float>();
-            if (config.TakeControl == null) config.TakeControl = new Dictionary<string, float>();
-            
-            return config;
+            return EnsureConfigCollections(config);
         }
 
         private void CreateDefaultConfig()
@@ -328,8 +350,35 @@ namespace MissionPlanner.SoftwareLab
             File.WriteAllText(configFilePath, JsonConvert.SerializeObject(defaultConfig, Formatting.Indented));
         }
 
+        private static PluginConfig EnsureConfigCollections(PluginConfig config)
+        {
+            if (config.GiveControl == null)
+                config.GiveControl = new Dictionary<string, float>();
+
+            if (config.TakeControl == null)
+                config.TakeControl = new Dictionary<string, float>();
+
+            return config;
+        }
+
         private void ShowAutoCloseMessage(string message)
         {
+            ShowAutoCloseMessage(message, SystemColors.ControlText);
+        }
+
+        private void ShowAutoCloseMessage(string message, Color textColor)
+        {
+            ShowAutoCloseMessage(new List<NotificationLine>
+            {
+                new NotificationLine(message, textColor)
+            });
+        }
+
+        private void ShowAutoCloseMessage(IReadOnlyList<NotificationLine> lines)
+        {
+            if (lines == null || lines.Count == 0)
+                return;
+
             Form form = new Form
             {
                 Text = "SoftwareLab Info",
@@ -342,26 +391,39 @@ namespace MissionPlanner.SoftwareLab
                 ShowInTaskbar = false
             };
 
-            Label label = new Label
+            TableLayoutPanel layout = new TableLayoutPanel
             {
-                Text = message,
                 Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Padding = new Padding(6),
-                Font = new Font("Arial", 12, FontStyle.Bold),
+                ColumnCount = 1,
+                RowCount = lines.Count,
+                Padding = new Padding(6)
             };
 
-            form.Controls.Add(label);
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+            for (int i = 0; i < lines.Count; i++)
+            {
+                NotificationLine line = lines[i];
+                layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / lines.Count));
+                layout.Controls.Add(new Label
+                {
+                    Text = line.Text,
+                    Dock = DockStyle.Fill,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Font = new Font("Arial", 12, FontStyle.Bold),
+                    ForeColor = line.Color,
+                    Margin = new Padding(0)
+                }, 0, i);
+            }
+
+            form.Controls.Add(layout);
 
             Rectangle workingArea = Screen.PrimaryScreen.WorkingArea;
 
             lock (activeNotifications)
             {
                 int index = activeNotifications.Count;
-                int x = workingArea.Left + ((workingArea.Width - NotificationWidth) / 2);
-                int y = workingArea.Top + ((workingArea.Height - NotificationHeight) / 2) + (index * NotificationSpacing);
-
-                form.Location = new Point(x, y);
+                form.Location = GetNotificationLocation(workingArea, index);
                 activeNotifications.Add(form);
             }
 
@@ -379,16 +441,7 @@ namespace MissionPlanner.SoftwareLab
                 lock (activeNotifications)
                 {
                     activeNotifications.Remove(form);
-
-                    Rectangle updatedWorkingArea = Screen.PrimaryScreen.WorkingArea;
-                    for (int i = 0; i < activeNotifications.Count; i++)
-                    {
-                        Form activeForm = activeNotifications[i];
-                        int x = updatedWorkingArea.Left + ((updatedWorkingArea.Width - NotificationWidth) / 2);
-                        int y = updatedWorkingArea.Top + ((updatedWorkingArea.Height - NotificationHeight) / 2) + (i * NotificationSpacing);
-
-                        activeForm.Location = new Point(x, y);
-                    }
+                    RepositionActiveNotifications(Screen.PrimaryScreen.WorkingArea);
                 }
 
                 form.Dispose();
@@ -396,6 +449,28 @@ namespace MissionPlanner.SoftwareLab
 
             timer.Start();
             form.Show();
+        }
+
+        private Point GetNotificationLocation(Rectangle workingArea, int index)
+        {
+            int x = workingArea.Left + ((workingArea.Width - NotificationWidth) / 2);
+            int y = workingArea.Top + ((workingArea.Height - NotificationHeight) / 2) + (index * NotificationSpacing);
+            return new Point(x, y);
+        }
+
+        private void RepositionActiveNotifications(Rectangle workingArea)
+        {
+            for (int i = 0; i < activeNotifications.Count; i++)
+                activeNotifications[i].Location = GetNotificationLocation(workingArea, i);
+        }
+
+        private static void ShowPluginError(string action, Exception ex)
+        {
+            MessageBox.Show(
+                $"Failed to {action}.\n{ex.Message}",
+                "SoftwareLab Error",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
         }
 
         public override bool Exit()
