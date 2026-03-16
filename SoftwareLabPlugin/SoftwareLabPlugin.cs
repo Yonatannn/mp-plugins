@@ -1,7 +1,8 @@
+using MissionPlanner.SoftwareLab.Notifications;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
 
@@ -9,7 +10,7 @@ namespace MissionPlanner.SoftwareLab
 {
     public partial class SoftwareLabPlugin : MissionPlanner.Plugin.Plugin
     {
-        public override string Name => "SoftwareLab Plugin";
+        public override string Name => "SoftwareLab Controls Plugin";
         public override string Version => "1.0";
         public override string Author => "Software";
 
@@ -22,14 +23,9 @@ namespace MissionPlanner.SoftwareLab
         private string configFilePath;
         private ToolStripMenuItem gpsMenu;
         private ToolStripMenuItem frskyMenu;
+        private bool hasWarnedMissingNotificationsPlugin;
 
         private readonly Dictionary<string, float> localParamCache = new Dictionary<string, float>();
-        private static readonly List<Form> activeNotifications = new List<Form>();
-        private const int NotificationWidth = 360;
-        private const int NotificationHeight = 180;
-        private const int NotificationSpacing = 12;
-        private static readonly Color SuccessNotificationColor = Color.Green;
-        private static readonly Color FailureNotificationColor = Color.Red;
 
         public override bool Init()
         {
@@ -135,9 +131,56 @@ namespace MissionPlanner.SoftwareLab
         {
             MessageBox.Show(
                 $"Failed to {action}.\n{ex.Message}",
-                "SoftwareLab Error",
+                "SoftwareLab Controls Error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
+        }
+
+        private void ShowAutoCloseMessage(string message)
+        {
+            ShowAutoCloseMessage(message, NotificationSeverity.Info);
+        }
+
+        private void ShowAutoCloseMessage(string message, NotificationSeverity severity)
+        {
+            ShowAutoCloseMessage(new List<NotificationLine>
+            {
+                new NotificationLine(message, severity)
+            });
+        }
+
+        private void ShowAutoCloseMessage(IReadOnlyList<NotificationLine> lines)
+        {
+            if (lines == null || lines.Count == 0)
+                return;
+
+            INotificationService notificationService = NotificationServiceRegistry.Current;
+            if (notificationService != null)
+            {
+                hasWarnedMissingNotificationsPlugin = false;
+                notificationService.ShowMessage(lines);
+                return;
+            }
+
+            WarnMissingNotificationsPluginOnce();
+            MessageBox.Show(
+                string.Join(Environment.NewLine, lines.Select(line => line.Text)),
+                "SoftwareLab Info",
+                MessageBoxButtons.OK,
+                lines.Any(line => line.Severity == NotificationSeverity.Error) ? MessageBoxIcon.Error : MessageBoxIcon.Information);
+        }
+
+        private void WarnMissingNotificationsPluginOnce()
+        {
+            if (hasWarnedMissingNotificationsPlugin)
+                return;
+
+            hasWarnedMissingNotificationsPlugin = true;
+            MessageBox.Show(
+                "SoftwareLabNotificationsPlugin.dll must also be loaded in Mission Planner to show plugin notifications.",
+                "SoftwareLab Controls Plugin",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
         }
 
         public override bool Exit()

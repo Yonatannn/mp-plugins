@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build SoftwareLab Plugin",
+            "label": "Build SoftwareLab Controls Plugin",
             "type": "shell",
             "command": "dotnet",
             "args": [
@@ -15,6 +15,24 @@
             "group": {
                 "kind": "build",
                 "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Build SoftwareLab Notifications Plugin",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/SoftwareLabNotificationsPlugin/SoftwareLabNotificationsPlugin.csproj"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
             },
             "presentation": {
                 "reveal": "always",

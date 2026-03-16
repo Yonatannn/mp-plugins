@@ -14,39 +14,15 @@
       <HintPath>C:\Program Files (x86)\Mission Planner\MissionPlanner.exe</HintPath>
       <Private>false</Private>
     </Reference>
-    
-    <Reference Include="MissionPlanner.Comms">
-      <HintPath>C:\Program Files (x86)\Mission Planner\MissionPlanner.Comms.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-
-    <Reference Include="MissionPlanner.ArduPilot">
-      <HintPath>C:\Program Files (x86)\Mission Planner\MissionPlanner.ArduPilot.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-
-    <Reference Include="MissionPlanner.MAVLink">
-      <HintPath>C:\Program Files (x86)\Mission Planner\MAVLink.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
 
     <Reference Include="MissionPlanner.Interfaces">
       <HintPath>C:\Program Files (x86)\Mission Planner\Interfaces.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>C:\Program Files (x86)\Mission Planner\Newtonsoft.Json.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="../SoftwareLabNotificationsPlugin/SoftwareLabNotificationsPlugin.csproj" />
   </ItemGroup>
 
 </Project>

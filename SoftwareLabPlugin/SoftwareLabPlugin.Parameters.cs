@@ -1,7 +1,7 @@
+using MissionPlanner.SoftwareLab.Notifications;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 
@@ -70,7 +70,7 @@ namespace MissionPlanner.SoftwareLab
                 if (!success)
                 {
                     if (showFailureMessage)
-                        ShowAutoCloseMessage(GetSetParamMessage(name, value, false), FailureNotificationColor);
+                        ShowAutoCloseMessage(GetSetParamMessage(name, value, false), NotificationSeverity.Error);
 
                     return false;
                 }
@@ -78,14 +78,14 @@ namespace MissionPlanner.SoftwareLab
                 localParamCache[name] = value;
 
                 if (showSuccessMessage)
-                    ShowAutoCloseMessage(GetSetParamMessage(name, value, true), SuccessNotificationColor);
+                    ShowAutoCloseMessage(GetSetParamMessage(name, value, true), NotificationSeverity.Success);
 
                 return true;
             }
             catch (Exception ex)
             {
                 if (showFailureMessage)
-                    ShowAutoCloseMessage(GetSetParamExceptionMessage(name, ex), FailureNotificationColor);
+                    ShowAutoCloseMessage(GetSetParamExceptionMessage(name, ex), NotificationSeverity.Error);
 
                 return false;
             }
@@ -168,17 +168,17 @@ namespace MissionPlanner.SoftwareLab
         private IReadOnlyList<NotificationLine> CreateNotificationLines(IReadOnlyCollection<string> successMessages, IReadOnlyCollection<string> failureMessages)
         {
             List<NotificationLine> lines = new List<NotificationLine>(2);
-            AddNotificationLine(lines, successMessages, SuccessNotificationColor);
-            AddNotificationLine(lines, failureMessages, FailureNotificationColor);
+            AddNotificationLine(lines, successMessages, NotificationSeverity.Success);
+            AddNotificationLine(lines, failureMessages, NotificationSeverity.Error);
             return lines;
         }
 
-        private static void AddNotificationLine(ICollection<NotificationLine> lines, IReadOnlyCollection<string> messages, Color color)
+        private static void AddNotificationLine(ICollection<NotificationLine> lines, IReadOnlyCollection<string> messages, NotificationSeverity severity)
         {
             if (messages.Count == 0)
                 return;
 
-            lines.Add(new NotificationLine(string.Join(", ", messages), color));
+            lines.Add(new NotificationLine(string.Join(", ", messages), severity));
         }
 
         private static string GetSetParamMessage(string name, float value, bool success)
