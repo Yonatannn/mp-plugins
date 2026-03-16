@@ -328,7 +328,6 @@ namespace MissionPlanner.SoftwareLab
                 StartPosition = FormStartPosition.Manual,
                 TopMost = true,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
-                BackColor = Color.Gainsboro,
                 MaximizeBox = false,
                 MinimizeBox = false,
                 ShowInTaskbar = false
@@ -340,8 +339,7 @@ namespace MissionPlanner.SoftwareLab
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleCenter,
                 Padding = new Padding(12),
-                Font = new Font("Arial", 9, FontStyle.Bold),
-                BackColor = Color.Gainsboro
+                Font = new Font("Arial", 12, FontStyle.Bold),
             };
 
             form.Controls.Add(label);
