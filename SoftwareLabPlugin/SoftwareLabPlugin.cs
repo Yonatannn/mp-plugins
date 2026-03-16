@@ -264,29 +264,29 @@ namespace MissionPlanner.SoftwareLab
 
                     if (success)
                     {
-                        successLines.Add($"{kvp.Key}: set to {kvp.Value}");
+                        successLines.Add($"Set {kvp.Key} to {kvp.Value}");
                     }
                     else
                     {
-                        failureLines.Add($"{kvp.Key}: failed to set to {kvp.Value}");
+                        failureLines.Add($"Failed to set {kvp.Key} to {kvp.Value}");
                     }
                 }
 
                 if (successLines.Count > 0 && failureLines.Count == 0)
                 {
-                    ShowAutoCloseMessage("Succeeded: " + string.Join(", ", successLines));
+                    ShowAutoCloseMessage(string.Join(", ", successLines));
                     return;
                 }
 
                 if (failureLines.Count > 0 && successLines.Count == 0)
                 {
-                    ShowAutoCloseMessage("Failed: " + string.Join(", ", failureLines));
+                    ShowAutoCloseMessage(string.Join(", ", failureLines));
                     return;
                 }
 
                 ShowAutoCloseMessage(
-                    "Succeeded: " + string.Join(", ", successLines) + Environment.NewLine +
-                    "Failed: " + string.Join(", ", failureLines));
+                    string.Join(", ", successLines) + Environment.NewLine +
+                    string.Join(", ", failureLines));
             }
             catch (Exception ex)
             {
