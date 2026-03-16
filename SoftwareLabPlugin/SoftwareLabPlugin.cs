@@ -248,24 +248,28 @@ namespace MissionPlanner.SoftwareLab
                     return;
                 }
 
-                int successCount = 0;
-                int failureCount = 0;
+                List<string> resultLines = new List<string>();
+                bool hasFailure = false;
 
                 foreach (var kvp in targetParams)
                 {
-                    if (SetSingleParam(kvp.Key, kvp.Value, false))
-                        successCount++;
-                    else
-                        failureCount++;
+                    bool success = SetSingleParam(kvp.Key, kvp.Value, false);
+                    resultLines.Add($"{kvp.Key}: {(success ? "Success" : "Failed")}");
+
+                    if (!success)
+                        hasFailure = true;
                 }
 
-                if (failureCount == 0)
+                string title = giveControl ? "Give Control" : "Take Control";
+                string details = string.Join(Environment.NewLine, resultLines);
+
+                if (!hasFailure)
                 {
-                    ShowAutoCloseMessage(giveControl ? "Give Control applied" : "Take Control applied");
+                    ShowAutoCloseMessage($"{title} applied{Environment.NewLine}{details}");
                     return;
                 }
 
-                ShowAutoCloseMessage($"Partial success: {successCount} succeeded, {failureCount} failed");
+                ShowAutoCloseMessage($"{title} completed with errors{Environment.NewLine}{details}");
             }
             catch (Exception ex)
             {
@@ -312,18 +316,18 @@ namespace MissionPlanner.SoftwareLab
             Form form = new Form
             {
                 Text = "SoftwareLab Info",
-                Size = new Size(300, 150),
+                Size = new Size(420, 220),
                 StartPosition = FormStartPosition.CenterScreen,
                 TopMost = true,
-                FormBorderStyle = FormBorderStyle.FixedToolWindow,
-                BackColor = Color.LightGreen
+                FormBorderStyle = FormBorderStyle.FixedDialog
             };
 
             Label label = new Label
             {
                 Text = message,
                 Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleCenter,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(12),
                 Font = new Font("Arial", 9, FontStyle.Bold)
             };
 
