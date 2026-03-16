@@ -262,7 +262,9 @@ namespace MissionPlanner.SoftwareLab
                 foreach (var kvp in targetParams)
                 {
                     bool success = SetSingleParam(kvp.Key, kvp.Value, false, false);
-                    resultLines.Add($"{kvp.Key}: {(success ? "Success" : "Failed")}");
+                    resultLines.Add(success
+                        ? $"{kvp.Key}: Success, set to {kvp.Value}"
+                        : $"{kvp.Key}: Failed to set to {kvp.Value}");
 
                     if (!success)
                         hasFailure = true;
