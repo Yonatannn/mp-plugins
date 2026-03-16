@@ -61,7 +61,7 @@ namespace MissionPlanner.SoftwareLab
                 var btnAuto = new ToolStripMenuItem("Toggle Auto Switch");
 
                 gpsMenu.DropDownOpening += (s, e) => UpdateGpsAutoText(btnAuto);
-                btnAuto.Click += (s, e) => ToggleGpsAuto();
+                btnAuto.Click += (s, e) => ToggleGpsAuto(btnAuto);
 
                 gpsMenu.DropDownItems.Add(btnPrimary);
                 gpsMenu.DropDownItems.Add(btnSecondary);
@@ -154,11 +154,7 @@ namespace MissionPlanner.SoftwareLab
 
                 if (!success)
                 {
-                    MessageBox.Show(
-                        $"Failed to set parameter {name} to {value}.",
-                        "SoftwareLab Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
+                    ShowAutoCloseMessage($"Failed to set {name} to {value}");
                     return false;
                 }
 
@@ -169,16 +165,12 @@ namespace MissionPlanner.SoftwareLab
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Failed to set parameter {name}.\n{ex.Message}",
-                    "SoftwareLab Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ShowAutoCloseMessage($"Failed to set {name}: {ex.Message}");
                 return false;
             }
         }
 
-        private void ToggleGpsAuto()
+        private void ToggleGpsAuto(ToolStripMenuItem item)
         {
             if (!IsConnected())
             {
@@ -190,7 +182,9 @@ namespace MissionPlanner.SoftwareLab
             {
                 float currentValue = Convert.ToSingle(Host.comPort.GetParam(GpsAutoSwitchParamName));
                 float nextValue = Math.Abs(currentValue - 1f) < 0.001f ? 0f : 1f;
-                SetSingleParam(GpsAutoSwitchParamName, nextValue);
+
+                if (SetSingleParam(GpsAutoSwitchParamName, nextValue))
+                    UpdateGpsAutoText(item);
             }
             catch
             {
@@ -204,7 +198,7 @@ namespace MissionPlanner.SoftwareLab
                 return;
 
             if (TryGetCachedParam(GpsAutoSwitchParamName, out float value))
-                item.Text = Math.Abs(value - 1f) < 0.001f ? "Disable Auto Switch (ON)" : "Enable Auto Switch (OFF)";
+                item.Text = Math.Abs(value - 1f) < 0.001f ? "Switch Auto Switch to OFF" : "Switch Auto Switch to ON";
             else
                 item.Text = "Toggle Auto Switch";
         }
@@ -245,19 +239,11 @@ namespace MissionPlanner.SoftwareLab
                     return;
                 }
 
-                MessageBox.Show(
-                    $"Completed with partial success.\nSucceeded: {successCount}\nFailed: {failureCount}",
-                    "SoftwareLab Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                ShowAutoCloseMessage($"Partial success: {successCount} succeeded, {failureCount} failed");
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Failed to apply config.\n{ex.Message}",
-                    "SoftwareLab Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ShowAutoCloseMessage($"Failed to apply config: {ex.Message}");
             }
         }
 
