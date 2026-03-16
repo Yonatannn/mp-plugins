@@ -25,8 +25,8 @@ namespace MissionPlanner.SoftwareLab
 
         private Dictionary<string, float> localParamCache = new Dictionary<string, float>();
         private static readonly List<Form> activeNotifications = new List<Form>();
-        private const int NotificationWidth = 420;
-        private const int NotificationHeight = 220;
+        private const int NotificationWidth = 360;
+        private const int NotificationHeight = 180;
         private const int NotificationSpacing = 12;
 
         public override bool Init()
@@ -256,30 +256,44 @@ namespace MissionPlanner.SoftwareLab
                     return;
                 }
 
-                List<string> resultLines = new List<string>();
+                List<string> successLines = new List<string>();
+                List<string> failureLines = new List<string>();
                 bool hasFailure = false;
 
                 foreach (var kvp in targetParams)
                 {
                     bool success = SetSingleParam(kvp.Key, kvp.Value, false, false);
-                    resultLines.Add(success
-                        ? $"{kvp.Key}: Success, set to {kvp.Value}"
-                        : $"{kvp.Key}: Failed to set to {kvp.Value}");
 
-                    if (!success)
+                    if (success)
+                    {
+                        successLines.Add($"{kvp.Key}: set to {kvp.Value}");
+                    }
+                    else
+                    {
                         hasFailure = true;
+                        failureLines.Add($"{kvp.Key}: failed to set to {kvp.Value}");
+                    }
                 }
 
                 string title = giveControl ? "Give Control" : "Take Control";
-                string details = string.Join(Environment.NewLine, resultLines);
 
                 if (!hasFailure)
                 {
+                    string details = "Succeeded:" + Environment.NewLine + string.Join(Environment.NewLine, successLines);
                     ShowAutoCloseMessage($"{title} applied{Environment.NewLine}{details}");
                     return;
                 }
 
-                ShowAutoCloseMessage($"{title} completed with errors{Environment.NewLine}{details}");
+                List<string> sections = new List<string>();
+
+                if (successLines.Count > 0)
+                    sections.Add("Succeeded:" + Environment.NewLine + string.Join(Environment.NewLine, successLines));
+
+                if (failureLines.Count > 0)
+                    sections.Add("Failed:" + Environment.NewLine + string.Join(Environment.NewLine, failureLines));
+
+                string detailsWithErrors = string.Join(Environment.NewLine + Environment.NewLine, sections);
+                ShowAutoCloseMessage($"{title} completed with errors{Environment.NewLine}{detailsWithErrors}");
             }
             catch (Exception ex)
             {
@@ -340,7 +354,7 @@ namespace MissionPlanner.SoftwareLab
                 Text = message,
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Padding = new Padding(12),
+                Padding = new Padding(6),
                 Font = new Font("Arial", 12, FontStyle.Bold),
             };
 
@@ -351,11 +365,8 @@ namespace MissionPlanner.SoftwareLab
             lock (activeNotifications)
             {
                 int index = activeNotifications.Count;
-                int x = workingArea.Right - NotificationWidth - NotificationSpacing;
-                int y = workingArea.Bottom - NotificationHeight - NotificationSpacing - (index * (NotificationHeight + NotificationSpacing));
-
-                if (y < NotificationSpacing)
-                    y = NotificationSpacing;
+                int x = workingArea.Left + ((workingArea.Width - NotificationWidth) / 2);
+                int y = workingArea.Top + ((workingArea.Height - NotificationHeight) / 2) + (index * NotificationSpacing);
 
                 form.Location = new Point(x, y);
                 activeNotifications.Add(form);
@@ -380,11 +391,8 @@ namespace MissionPlanner.SoftwareLab
                     for (int i = 0; i < activeNotifications.Count; i++)
                     {
                         Form activeForm = activeNotifications[i];
-                        int x = updatedWorkingArea.Right - NotificationWidth - NotificationSpacing;
-                        int y = updatedWorkingArea.Bottom - NotificationHeight - NotificationSpacing - (i * (NotificationHeight + NotificationSpacing));
-
-                        if (y < NotificationSpacing)
-                            y = NotificationSpacing;
+                        int x = updatedWorkingArea.Left + ((updatedWorkingArea.Width - NotificationWidth) / 2);
+                        int y = updatedWorkingArea.Top + ((updatedWorkingArea.Height - NotificationHeight) / 2) + (i * NotificationSpacing);
 
                         activeForm.Location = new Point(x, y);
                     }
