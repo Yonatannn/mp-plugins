@@ -4,9 +4,13 @@
         {
             "label": "Build SoftwareLab Plugin",
             "type": "shell",
-            "command": "dotnet build",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/SoftwareLabPlugin/SoftwareLabPlugin.csproj"
+            ],
             "options": {
-                "cwd": "${workspaceFolder}/SoftwareLabPlugin"
+                "cwd": "${workspaceFolder}"
             },
             "group": {
                 "kind": "build",
