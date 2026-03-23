@@ -55,12 +55,12 @@ Each project writes its build output into `build/<ProjectName>/bin/`.
 
 ## VS Code Dev Container
 
-The repository includes a Linux-oriented VS Code devcontainer for producing the plugin DLLs in a repeatable way. The image is built from the official `mcr.microsoft.com/devcontainers/dotnet:1-8.0-bookworm` base image and adds Mono/MSBuild support so the existing `net472` plugin projects can still build cleanly.
+The repository includes a Linux-oriented VS Code devcontainer for producing the plugin DLLs in a repeatable way. The image now builds from the lean official `mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim` base image instead of the heavier devcontainers image, which avoids the extra APT repository/key issues that were causing GPG failures during container builds while still providing the .NET SDK needed for `dotnet build`.
 
 ### What is included
 
 * .NET SDK in the base devcontainer image for `dotnet build` workflows.
-* Mono, MSBuild, and NuGet for the existing Mission Planner plugin projects.
+* Mono and NuGet support for the existing Mission Planner plugin projects, while the main build entrypoint remains `dotnet build`.
 * A shared solution file, `SoftwareLabPlugins.sln`, so the whole repo can be built from VS Code or the terminal with one command.
 * A baked-in `/opt/mission-planner` folder that can be populated from `.devcontainer/mission-planner/` before building the image.
 
