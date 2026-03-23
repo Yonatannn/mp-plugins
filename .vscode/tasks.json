@@ -3,11 +3,17 @@
     "tasks": [
         {
             "label": "Build SoftwareLab Plugins",
-            "dependsOn": [
-                "Build SoftwareLab GPS Plugin",
-                "Build SoftwareLab FrSky Plugin"
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/SoftwareLabPlugins.sln",
+                "--configuration",
+                "Release"
             ],
-            "dependsOrder": "sequence",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -17,7 +23,7 @@
                 "panel": "shared",
                 "clear": true
             },
-            "problemMatcher": []
+            "problemMatcher": "$msCompile"
         },
         {
             "label": "Build SoftwareLab GPS Plugin",
@@ -25,7 +31,9 @@
             "command": "dotnet",
             "args": [
                 "build",
-                "${workspaceFolder}/SoftwareLabGpsPlugin/SoftwareLabGpsPlugin.csproj"
+                "${workspaceFolder}/SoftwareLabGpsPlugin/SoftwareLabGpsPlugin.csproj",
+                "--configuration",
+                "Release"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -43,7 +51,9 @@
             "command": "dotnet",
             "args": [
                 "build",
-                "${workspaceFolder}/SoftwareLabFrSkyPlugin/SoftwareLabFrSkyPlugin.csproj"
+                "${workspaceFolder}/SoftwareLabFrSkyPlugin/SoftwareLabFrSkyPlugin.csproj",
+                "--configuration",
+                "Release"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -61,7 +71,9 @@
             "command": "dotnet",
             "args": [
                 "build",
-                "${workspaceFolder}/SoftwareLabNotificationsPlugin/SoftwareLabNotificationsPlugin.csproj"
+                "${workspaceFolder}/SoftwareLabNotificationsPlugin/SoftwareLabNotificationsPlugin.csproj",
+                "--configuration",
+                "Release"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"

@@ -12,12 +12,12 @@
 
   <ItemGroup>
     <Reference Include="MissionPlanner">
-      <HintPath>C:\Program Files (x86)\Mission Planner\MissionPlanner.exe</HintPath>
+      <HintPath>$(MissionPlannerDir)MissionPlanner.exe</HintPath>
       <Private>false</Private>
     </Reference>
 
     <Reference Include="MissionPlanner.Interfaces">
-      <HintPath>C:\Program Files (x86)\Mission Planner\Interfaces.dll</HintPath>
+      <HintPath>$(MissionPlannerDir)Interfaces.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

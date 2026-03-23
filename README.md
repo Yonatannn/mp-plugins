@@ -53,6 +53,50 @@ The workspace includes four VS Code tasks:
 
 Each project writes its build output into `build/<ProjectName>/bin/`.
 
+## VS Code Dev Container
+
+The repository includes a Linux-oriented VS Code devcontainer for producing the plugin DLLs in a repeatable way. The image is built from the official `mcr.microsoft.com/devcontainers/dotnet:1-8.0-bookworm` base image and adds Mono/MSBuild support so the existing `net472` plugin projects can still build cleanly.
+
+### What is included
+
+* .NET SDK in the base devcontainer image for `dotnet build` workflows.
+* Mono, MSBuild, and NuGet for the existing Mission Planner plugin projects.
+* A shared solution file, `SoftwareLabPlugins.sln`, so the whole repo can be built from VS Code or the terminal with one command.
+* A baked-in `/opt/mission-planner` folder that can be populated from `.devcontainer/mission-planner/` before building the image.
+
+### Mission Planner dependencies
+
+The plugins reference Mission Planner assemblies directly, so these files must exist in `/opt/mission-planner` inside the container:
+
+* `MissionPlanner.exe`
+* `MissionPlanner.Comms.dll`
+* `MissionPlanner.ArduPilot.dll`
+* `MAVLink.dll`
+* `Interfaces.dll`
+* `Newtonsoft.Json.dll`
+
+The repo resolves those references through the `MissionPlannerDir` MSBuild property. On Linux/devcontainer builds it defaults to `/opt/mission-planner/`, while on Windows it still falls back to the standard Mission Planner install path.
+
+### Recommended offline workflow
+
+1. On a machine with internet access, copy the required Mission Planner files into `.devcontainer/mission-planner/`.
+2. Build the image: `bash .devcontainer/build-image.sh mp-plugins-devcontainer:latest`
+3. Save the image: `bash .devcontainer/save-image.sh mp-plugins-devcontainer:latest mp-plugins-devcontainer.tar`
+4. Transfer the tar file to the offline Linux machine and load it with Docker or Podman.
+5. Open this repository in VS Code with the devcontainer and run the build tasks.
+
+### VS Code build flow
+
+The devcontainer is configured so the default VS Code build task runs:
+
+```bash
+dotnet build SoftwareLabPlugins.sln --configuration Release
+```
+
+Per-plugin tasks also exist for the GPS, FrSky, and Notifications DLLs. If you add a new plugin later, add its project to `SoftwareLabPlugins.sln` and optionally add a dedicated task in `.vscode/tasks.json`.
+
+Run `bash .devcontainer/validate-mission-planner.sh` before building if you want a quick check that the required Mission Planner assemblies are present in the container.
+
 ## Installation
 
 1. Build the required plugins.

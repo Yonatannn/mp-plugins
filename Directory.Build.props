@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <MissionPlannerDir Condition="'$(MissionPlannerDir)' == '' and '$(MISSION_PLANNER_DIR)' != ''">$(MISSION_PLANNER_DIR)/</MissionPlannerDir>
+    <MissionPlannerDir Condition="'$(MissionPlannerDir)' == '' and Exists('/opt/mission-planner')">/opt/mission-planner/</MissionPlannerDir>
+    <MissionPlannerDir Condition="'$(MissionPlannerDir)' == ''">C:\Program Files (x86)\Mission Planner\</MissionPlannerDir>
+  </PropertyGroup>
+</Project>
